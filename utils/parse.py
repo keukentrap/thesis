@@ -40,9 +40,17 @@ with open('APTMalware/overview.csv','r') as csvfile:
             #    print(fname)
 
             # Per country:
-            #c = label_by(row,'Country',labels)
+            c = label_by(row,'Country',labels)
+
+            # China vs North-Korea
+            #if not c in [0,2]:
+            #    continue
+
+            #if c == 2:
+            #    c = 1
+
 
             # Per apt-group
-            c = label_by(row,'APT-group',labels)
+            #c = label_by(row,'APT-group',labels)
 
             writer.writerow({'Sample': fname, "Label": c }) #'Country': row['Country'], 'APT-group': row['APT-group']})

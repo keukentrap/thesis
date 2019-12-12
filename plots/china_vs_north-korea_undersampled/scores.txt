@@ -1,0 +1,14 @@
+prediction dataset size: 1133
+accuracy: 0.9055604589585172
+recall: {0: 0.9099181073703366, 1: 0.7647058823529411}
+precision: {0: 0.9920634920634921, 1: 0.208}
+kappa: 0.2937190862642516
+matthew corcoef: 0.3673794104380978
+              precision    recall  f1-score   support
+
+           0      0.992     0.910     0.949      1099
+           1      0.208     0.765     0.327        34
+
+    accuracy                          0.906      1133
+   macro avg      0.600     0.837     0.638      1133
+weighted avg      0.969     0.906     0.931      1133

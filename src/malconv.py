@@ -13,6 +13,7 @@ def Malconv(max_len=200000, win_size=500, vocab_size=256, out_size=5):
     a = Activation('relu', name='relu')(mul)
     p = GlobalMaxPool1D()(a)
     d = Dense(64)(p)
+    #out = Dense(out_size, activation='sigmoid')(d)
     out = Dense(out_size, activation='softmax')(d)
 
     return Model(inp, out)

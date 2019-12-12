@@ -1,9 +1,11 @@
+#!/bin/python3
+
 from os.path import join
 import argparse
 import pickle
 import warnings
 import pandas as pd
-from keras.callbacks import ModelCheckpoint, EarlyStopping, LearningRateScheduler
+from keras.callbacks import ModelCheckpoint, EarlyStopping, LearningRateScheduler, ReduceLROnPlateau
 from keras.models import load_model
 from keras import optimizers
 import math
@@ -22,14 +24,15 @@ import predict
 #TEMP
 from collections import Counter
 
-
+from sklearn.utils import class_weight
+import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore")
 
 parser = argparse.ArgumentParser(description='Malconv-keras classifier training')
 parser.add_argument('--batch_size', type=int, default=64)
 parser.add_argument('--verbose', type=int, default=1)
-parser.add_argument('--epochs', type=int, default=10)
+parser.add_argument('--epochs', type=int, default=100)
 parser.add_argument('--limit', type=float, default=0., help="limit gpy memory percentage")
 parser.add_argument('--max_len', type=int, default=200000, help="model input legnth")
 parser.add_argument('--win_size', type=int, default=500)
@@ -56,23 +59,48 @@ def train(model, max_len=200000, batch_size=64, verbose=True, epochs=100, save_p
         return lrate
 
     # callbacks
-    ear = EarlyStopping(monitor='val_acc', patience=5)
+    ear = EarlyStopping(monitor='val_acc', patience=7)
     mcp = ModelCheckpoint(join(save_path, 'malconv.h5'), 
                           monitor="val_acc", 
                           save_best_only=save_best, 
                           save_weights_only=False)
-    lrs = LearningRateScheduler(schedule=step_decay)
-    
+    #lrs = LearningRateScheduler(schedule=step_decay)
+    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2,
+                                 patience = 4, min_lr=0.00001)
+
+    y_argmax = np.argmax(y_train,axis=1)
+    print(y_argmax)
+    class_weights = class_weight.compute_class_weight('balanced',
+                                                      np.unique(y_argmax),
+                                                      y_argmax)
+
     history = model.fit_generator(
         utils.data_generator(x_train, y_train, max_len, batch_size, shuffle=True),
         steps_per_epoch=len(x_train)//batch_size + 1,
         epochs=epochs, 
         verbose=verbose, 
-        callbacks=[ear, mcp,lrs],
+        callbacks=[ear, mcp, reduce_lr],
         validation_data=utils.data_generator(x_test, y_test, max_len, batch_size),
-        validation_steps=len(x_test)//batch_size + 1)
+        validation_steps=len(x_test)//batch_size + 1,
+        class_weight=class_weights
+    )
+
     return history
 
+def plot_history(history):
+    # plot loss during training
+    plt.subplot(211)
+    plt.title('Loss')
+    plt.plot(history.history['loss'], label='train')
+    plt.plot(history.history['val_loss'], label='test')
+    plt.legend()
+    # plot accuracy during training
+    plt.subplot(212)
+    plt.title('Accuracy')
+    plt.plot(history.history['accuracy'], label='train')
+    plt.plot(history.history['val_accuracy'], label='test')
+    plt.legend()
+    plt.show()
     
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -95,8 +123,12 @@ if __name__ == '__main__':
         model = Malconv(args.max_len, args.win_size, out_size=n_classes)
         # default:
         # adam = optimizers.adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999, amsgrad=False)
+
         adam = optimizers.adam(lr=0.001, beta_1=0.9, beta_2=0.999, amsgrad=False)
-        model.compile(loss='binary_crossentropy', optimizer=adam, metrics=['acc'])
+        # model.compile(loss='binary_crossentropy', optimizer=adam, metrics=['acc'])
+        # model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['acc'])
+        model.compile(loss='kullback_leibler_divergence', optimizer=adam, metrics=['acc'])
+        
     
     
 
@@ -137,9 +169,6 @@ if __name__ == '__main__':
         print('Train on %d data, test on %d data' % (len(x_train), len(x_test)))
         history = train(model, args.max_len, args.batch_size, args.verbose, args.epochs, args.save_path, args.save_best)
     
-    with open(join(args.save_path, 'history.pkl'), 'wb') as f:
-        pickle.dump(history.history, f)
-    
     if args.under_sample:
         pred = predict.predict(model, predict_data, predict_label, args.batch_size, args.verbose)
         pred = pred.argmax(1)
@@ -150,5 +179,10 @@ if __name__ == '__main__':
         df_predict[0] = [i.split('/')[-1] for i in predict_data] # os.path.basename
         df_predict.to_csv(result_path, header=None, index=False)
         print('Results writen in', result_path)
+    
+    # Should be in plot.py
+    plot_history(history)
 
+    with open(join(args.save_path, 'history.pkl'), 'wb') as f:
+            pickle.dump(history.history, f)
 

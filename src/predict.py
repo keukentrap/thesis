@@ -7,6 +7,7 @@ from keras.utils.np_utils import to_categorical
 
 
 
+
 import numpy as np
 
 import utils
@@ -42,15 +43,30 @@ if __name__ == '__main__':
     
     # read data
     df = pd.read_csv(args.csv, header=None)
-    fn_list = df[0].values
+    df.columns = ['fn_list', 'y_true']
+    fn_list = df['fn_list'].values
     label = np.zeros((fn_list.shape))
 
-    pred = predict(model, fn_list, label, args.batch_size, args.verbose)
-    pred = pred.argmax(1)
+    pred_proba = predict(model, fn_list, label, args.batch_size, args.verbose)
+    pred = pred_proba.argmax(1)
+
+    #pred = np.eye(len(classes))[y_pred]
+    import scikitplot as skplt
+    import matplotlib.pyplot as plt
+
+    
+    y_true = df['y_true'].values
+    skplt.metrics.plot_roc(y_true,pred_proba)
+    plt.savefig("/tmp/roc.pdf")
+
+    #pred_proba = model.predict_proba(model, fn_list, label, args.batch_size, args.verbose)
+    #pred_proba = pred_proba.argmax(1)
 
     #print(df[1].values)
-    df['predict score'] = pred
-    df[0] = [i.split('/')[-1] for i in fn_list] # os.path.basename
-    df.to_csv(args.result_path, header=None, index=False)
+    df['y_pred'] = pred
+    #df['predcit probability'] = pred_proba
+    df['fn_list'] = [i.split('/')[-1] for i in fn_list] # os.path.basename
+    df = df.join(pd.DataFrame(pred_proba),rsuffix="_proba")
+    df.to_csv(args.result_path, header=True, index=False)
     print('Results writen in', args.result_path)
 
