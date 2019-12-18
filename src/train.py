@@ -12,6 +12,11 @@ import math
 
 import numpy as np
 
+from sklearn.metrics import matthews_corrcoef
+
+import keras.backend as K
+from keras import losses
+
 import utils
 from malconv import Malconv
 from preprocess import preprocess
@@ -51,7 +56,7 @@ def train(model, max_len=200000, batch_size=64, verbose=True, epochs=100, save_p
     
     #Learning rate schedulers
     def step_decay(epoch):
-        initial_lrate = 0.001
+        initial_lrate = 0.01
         drop = 0.5
         epochs_drop = 5.0
         lrate = initial_lrate * math.pow(drop,  
@@ -59,17 +64,17 @@ def train(model, max_len=200000, batch_size=64, verbose=True, epochs=100, save_p
         return lrate
 
     # callbacks
-    ear = EarlyStopping(monitor='val_acc', patience=7)
+    ear = EarlyStopping(monitor='val_acc', patience=3)
     mcp = ModelCheckpoint(join(save_path, 'malconv.h5'), 
                           monitor="val_acc", 
                           save_best_only=save_best, 
                           save_weights_only=False)
-    #lrs = LearningRateScheduler(schedule=step_decay)
-    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2,
-                                 patience = 4, min_lr=0.00001)
+    lrs = LearningRateScheduler(schedule=step_decay)
+    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.3,
+                                 patience = 3, min_lr=0.00001)
 
+    
     y_argmax = np.argmax(y_train,axis=1)
-    print(y_argmax)
     class_weights = class_weight.compute_class_weight('balanced',
                                                       np.unique(y_argmax),
                                                       y_argmax)
@@ -79,10 +84,11 @@ def train(model, max_len=200000, batch_size=64, verbose=True, epochs=100, save_p
         steps_per_epoch=len(x_train)//batch_size + 1,
         epochs=epochs, 
         verbose=verbose, 
-        callbacks=[ear, mcp, reduce_lr],
+        callbacks=[ear, mcp,reduce_lr],
         validation_data=utils.data_generator(x_test, y_test, max_len, batch_size),
         validation_steps=len(x_test)//batch_size + 1,
-        class_weight=class_weights
+        class_weight=class_weights,
+        
     )
 
     return history
@@ -93,14 +99,17 @@ def plot_history(history):
     plt.title('Loss')
     plt.plot(history.history['loss'], label='train')
     plt.plot(history.history['val_loss'], label='test')
+    plt.savefig("../saved/loss.pdf")
     plt.legend()
     # plot accuracy during training
     plt.subplot(212)
     plt.title('Accuracy')
-    plt.plot(history.history['accuracy'], label='train')
-    plt.plot(history.history['val_accuracy'], label='test')
+    plt.plot(history.history['acc'], label='train')
+    plt.plot(history.history['val_acc'], label='test')
     plt.legend()
+    plt.savefig("../saved/acc.pdf")
     plt.show()
+
     
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -124,10 +133,34 @@ if __name__ == '__main__':
         # default:
         # adam = optimizers.adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999, amsgrad=False)
 
-        adam = optimizers.adam(lr=0.001, beta_1=0.9, beta_2=0.999, amsgrad=False)
-        # model.compile(loss='binary_crossentropy', optimizer=adam, metrics=['acc'])
-        # model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['acc'])
-        model.compile(loss='kullback_leibler_divergence', optimizer=adam, metrics=['acc'])
+        def mcc(y_true, y_pred):
+            ''' Matthews correlation coefficient
+            '''
+            y_pred_pos = K.round(K.clip(y_pred, 0, 1))
+            y_pred_neg = 1 - y_pred_pos
+
+            y_pos = K.round(K.clip(y_true, 0, 1))
+            y_neg = 1 - y_pos
+
+            tp = K.sum(y_pos * y_pred_pos)
+            tn = K.sum(y_neg * y_pred_neg)
+
+            fp = K.sum(1 - y_neg * y_pred_pos)
+            fn = K.sum(1 - y_pos * y_pred_neg)
+
+            numerator = (tp * tn - fp * fn)
+            denominator = K.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+
+            return numerator / (denominator + K.epsilon())
+
+
+
+        adam = optimizers.adam(lr=0.01, beta_1=0.9, beta_2=0.999, amsgrad=True)
+        #sgd = optimizers.SGD(learning_rate=0.01, momentum=0.9)
+        # model.compile(loss='binary_crossentropy', optimizer=adam, metrics=['acc',mcc])
+        model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['acc'])
+        #model.compile(loss=losses.CategoricalCrossentropy(from_logits=True), optimizer=adam, metrics=['acc'])
+        #model.compile(loss='kullback_leibler_divergence', optimizer=adam, metrics=['acc',mcc])
         
     
     
@@ -153,6 +186,7 @@ if __name__ == '__main__':
         for train_data, test in kfold.split(data, label):
             #x_train, x_test, y_train, y_test = data[train], data[test], label[train], label[test]
             x_train, x_test, y_train, y_test = utils.train_test_split(data[train_data], label[train_data], args.val_size)
+            #y_train = y_train.astype(float)
             print('Train on %d data, test on %d data' % (len(x_train), len(x_test)))
             history = train(model, args.max_len, args.batch_size, args.verbose, args.epochs, args.save_path, args.save_best)
             
@@ -166,6 +200,7 @@ if __name__ == '__main__':
         history = best_history
     else: 
         x_train, x_test, y_train, y_test = utils.train_test_split(data, label, args.val_size)
+        #y_train = y_train.astype(float)
         print('Train on %d data, test on %d data' % (len(x_train), len(x_test)))
         history = train(model, args.max_len, args.batch_size, args.verbose, args.epochs, args.save_path, args.save_best)
     
