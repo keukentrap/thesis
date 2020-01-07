@@ -147,19 +147,22 @@ def calculate_precision_recall(y_true,y_pred):
     #                                                 average="micro")
     return precision,recall, 0
 
-def plot_metrics(history):
+def plot_metrics(history, location):
     plt.subplot(211)
-    plt.title('Loss')
-    plt.plot(history['loss'], label='train')
-    plt.plot(history['val_loss'], label='test')
+    # plt.title('Loss')
+    # plt.plot(history['loss'], label='train')
+    # plt.plot(history['val_loss'], label='test')
+    plt.plot(history['lr'], label='lr')
     plt.legend()
     # plt accuracy during training
     plt.subplot(212)
     plt.title('Accuracy')
     plt.plot(history['acc'], label='train')
     plt.plot(history['val_acc'], label='test')
+    
     plt.legend()
-    plt.show()
+    plt.savefig(location + "accloss.pdf")
+    
 
 def get_plot_directory(plot_title):
     if plot_title:
@@ -254,7 +257,7 @@ def plot(y_true,y_pred,y_proba,plot_title):
     with open('../saved/history.pkl', 'rb') as f:
             history = pickle.load(f)
             print(history.keys())
-            plot_metrics(history)
+            plot_metrics(history, location)
 
     with open(location + "scores.txt", 'w') as f:
         f.write("prediction dataset size: {}\n".format(len(y_true)))

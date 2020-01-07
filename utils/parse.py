@@ -19,8 +19,16 @@ def label_by(row, name, labels):
     #isChina = 0 if row['Country'] == "China" else 1
     return c
 
+def merge_asia(row):
+    c = row['Country']
+    if c in ['China','North-Korea','Russia']:
+        return 0
+    if c in ['Pakistan']:
+        return 1
+    if c in ['USA']:
+        return 2
 
-with open('APTMalware/overview.csv','r') as csvfile:
+with open('../dataset/APTMalware/overview.csv','r') as csvfile:
     with open('../input/dataset.csv', 'w') as outfile:
         reader = csv.DictReader(csvfile, delimiter=',', quotechar='\'')
         fieldnames = ['Sample', 'Label']
@@ -30,7 +38,7 @@ with open('APTMalware/overview.csv','r') as csvfile:
         for row in reader:
             if row['Status'] == "X":
                 continue
-            fname = "APTMalware/samples/{}/{}.zip".format(row['APT-group'],row['SHA256'])
+            fname = "../dataset/APTMalware/samples/{}/{}.zip".format(row['APT-group'],row['SHA256'])
             input_zip = zipfile.ZipFile(str(fname))
             input_zip.setpassword(b"infected")
             samplename = input_zip.namelist()[0]
@@ -40,7 +48,7 @@ with open('APTMalware/overview.csv','r') as csvfile:
             #    print(fname)
 
             # Per country:
-            c = label_by(row,'Country',labels)
+            #c = label_by(row,'Country',labels)
 
             # China vs North-Korea
             #if not c in [0,2]:
@@ -49,6 +57,8 @@ with open('APTMalware/overview.csv','r') as csvfile:
             #if c == 2:
             #    c = 1
 
+            # Merge China, North-Korea and Russia together into Asia.
+            c = merge_asia(row)
 
             # Per apt-group
             #c = label_by(row,'APT-group',labels)

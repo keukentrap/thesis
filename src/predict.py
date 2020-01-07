@@ -7,29 +7,10 @@ from keras.utils.np_utils import to_categorical
 
 import keras.backend as K
 
-def mcc(y_true, y_pred):
-    ''' Matthews correlation coefficient
-    '''
-    y_pred_pos = K.round(K.clip(y_pred, 0, 1))
-    y_pred_neg = 1 - y_pred_pos
-
-    y_pos = K.round(K.clip(y_true, 0, 1))
-    y_neg = 1 - y_pos
-
-    tp = K.sum(y_pos * y_pred_pos)
-    tn = K.sum(y_neg * y_pred_neg)
-
-    fp = K.sum(1 - y_neg * y_pred_pos)
-    fn = K.sum(1 - y_pos * y_pred_neg)
-
-    numerator = (tp * tn - fp * fn)
-    denominator = K.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
-
-    return numerator / (denominator + K.epsilon())
-
 import numpy as np
 
 import utils
+from utils import mcc
 from preprocess import preprocess
 
 parser = argparse.ArgumentParser(description='Malconv-keras classifier')
@@ -43,12 +24,22 @@ parser.add_argument('csv', type=str)
 def predict(model, fn_list, label, batch_size=64, verbose=1):
     
     max_len = model.input.shape[1]
-    pred = model.predict_generator(
+    pred_proba = model.predict_generator(
         utils.data_generator(fn_list, label, max_len, batch_size, shuffle=False),
         steps=len(fn_list)//batch_size + 1,
         verbose=verbose
         )
-    return pred
+    pred = pred_proba.argmax(1)
+    return pred, pred_proba
+
+def write_to_csv(filepath, fn_list, y_true, y_pred, y_pred_proba):
+    df = pd.DataFrame(columns=['fn_list','y_true','y_pred'])
+    df['fn_list'] = fn_list
+    df['y_true'] = y_true
+    df['y_pred'] = y_pred
+    df = df.join(pd.DataFrame(y_pred_proba),rsuffix="_proba")
+    df.to_csv(filepath, header=True, index=False)
+    print('Results writen in', filepath)
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -64,28 +55,10 @@ if __name__ == '__main__':
     df = pd.read_csv(args.csv, header=None)
     df.columns = ['fn_list', 'y_true']
     fn_list = df['fn_list'].values
-    label = np.zeros((fn_list.shape))
+    y_true  = df['y_true'].values
+    #label = np.zeros((fn_list.shape))
 
-    pred_proba = predict(model, fn_list, label, args.batch_size, args.verbose)
-    pred = pred_proba.argmax(1)
+    pred, pred_proba = predict(model, fn_list, y_true, args.batch_size, args.verbose)
 
-    #pred = np.eye(len(classes))[y_pred]
-    import scikitplot as skplt
-    import matplotlib.pyplot as plt
-
-    
-    y_true = df['y_true'].values
-    skplt.metrics.plot_roc(y_true,pred_proba)
-    plt.savefig("/tmp/roc.pdf")
-
-    #pred_proba = model.predict_proba(model, fn_list, label, args.batch_size, args.verbose)
-    #pred_proba = pred_proba.argmax(1)
-
-    #print(df[1].values)
-    df['y_pred'] = pred
-    #df['predcit probability'] = pred_proba
-    df['fn_list'] = [i.split('/')[-1] for i in fn_list] # os.path.basename
-    df = df.join(pd.DataFrame(pred_proba),rsuffix="_proba")
-    df.to_csv(args.result_path, header=True, index=False)
-    print('Results writen in', args.result_path)
+    write_to_csv(args.result_path,fn_list,y_true,pred,pred_proba)
 

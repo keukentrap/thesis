@@ -1,7 +1,7 @@
 #!/bin/sh
 set +e
 
-cd input
+cd ../input
 # 3594 samples
 shuf dataset.csv -o test.csv
 
