@@ -24,10 +24,19 @@ from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import os
 
+import seaborn as sns
+
+
+
 parser = argparse.ArgumentParser(description='Malconv-keras classifier')
 parser.add_argument('--verbose', type=int, default=1)
 parser.add_argument('--csv', type=str, default='../saved/result.csv')
 parser.add_argument('--plot-title', type=str, default='')
+
+def init_seaborn():
+    # sns.set()
+    # sns.set_style("ticks")
+    return
 
 def plot_confusion_matrix(y_true, y_pred, classes,
                           normalize=False,
@@ -54,7 +63,10 @@ def plot_confusion_matrix(y_true, y_pred, classes,
 
     print(cm)
 
-    fig, ax = plt.subplots()
+    # Adjust this for a different figure size.
+    # fig, ax = plt.subplots(figsize=(8,6))
+    fig, ax = plt.subplots(figsize=(4,3))
+
     im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
     ax.figure.colorbar(im, ax=ax)
 
@@ -62,16 +74,41 @@ def plot_confusion_matrix(y_true, y_pred, classes,
     #plt.xticks(ticks=np.arange(cm.shape[1]),
     #           labels = classes)
     
+    
     #ax.set_yticklabels(classes)
+
     ax.set(xticks=np.arange(cm.shape[1]),
            yticks=np.arange(cm.shape[0]),
            xticklabels= classes, yticklabels= classes,
-           title=title,
+        #    title=title,
            ylabel='True label',
            xlabel='Predicted label',
 
            )
     ax.set_ylim(len(classes)-0.5, -0.5)
+
+    # Color the tick labels
+    # def color_ticks(t):
+        # a = t.get_text()
+        # if a in ["APT 1", "APT 10", "APT 19", "APT 21", "APT 30", "Winnti"]:
+        #     # China
+        #     t.set_color('xkcd:red') 
+        # elif a in ["APT 28", "APT 29", "Energetic Bear"]:
+        #     # Russia
+        #     t.set_color('xkcd:blue')
+        # elif a in ["DarkHotel"]:
+        #     # North-Korea
+        #     t.set_color('xkcd:green')
+        # elif a in ['Equation Group']:
+        #     t.set_color("xkcd:gold")
+        # elif a in ['Gorgon Group']:
+        #     t.set_color("black")
+    # for t in ax.xaxis.get_ticklabels():
+    #     color_ticks(t)
+    # for t in ax.yaxis.get_ticklabels():
+    #     color_ticks(t)  
+
+    
     #plt.yticks(ticks=np.arange(cm.shape[0]), labels=classes)
     #plt.yticks(ticks=np.arange(cm.shape[1]+1) - 0.5,
     #           labels =[''] + classes)
@@ -91,6 +128,11 @@ def plot_confusion_matrix(y_true, y_pred, classes,
     thresh = cm.max() / 2.
     for i in range(cm.shape[0]):
         for j in range(cm.shape[1]):
+            if cm[i,j] == 0.0:
+                  plt.text(j, i, "0",
+                    ha="center", va="center",
+                    color="white" if cm[i, j] > thresh else "black")
+                  continue
             plt.text(j, i, format(cm[i, j], fmt),
                     ha="center", va="center",
                     color="white" if cm[i, j] > thresh else "black")
@@ -177,9 +219,19 @@ def get_plot_directory(plot_title):
 def plot(y_true,y_pred,y_proba,plot_title):
     #classes = ['China', 'Russia', 'North-Korea', 'USA', 'Pakistan'] 
     #classes = ["APT-{}".format(i+1) for i in np.unique(y_true)]
-    classes = ["Country {}".format(i) for i in range(5)]
+    y_uniq = np.unique(y_true)
+    classes = ["Country {}".format(i) for i in y_uniq]
+
+    # CORRECT ONE
+    # classes = ["APT 1", "APT 10", "APT 19", "APT 21", "APT 28", "APT 29", "APT 30", "DarkHotel", "Energetic Bear", "Equation Group", "Gorgon Group", "Winnti"]
+    
+    # WRONG ONE
+    # classes = ["APT 1", "APT 10", "APT 19", "APT 21", "APT 30", "Winnti", "APT 28", "APT 29", "Energetic Bear", "DarkHotel", "Equation Group", "Gorgon Group"]
+    
+    # classes = ["Country 0,1 & 2", "Country 4", "Country 3"]
+    #classes = ['Asia','Pakistan','USA']
     #classes = ['China', 'North-Korea']
-    location =get_plot_directory(plot_title)
+    location = get_plot_directory(plot_title)
 
     # cnf_matrix = confusion_matrix(y_true, pred,labels=range(5))
     np.set_printoptions(precision=2)
@@ -199,6 +251,7 @@ def plot(y_true,y_pred,y_proba,plot_title):
     norm.savefig(location + "normalized.pdf")
     plt.clf()
 
+    
     # BROKEN
     # skplt.metrics.plot_confusion_matrix(y_true,y_pred,
     #                             #    classes=classes,
@@ -256,7 +309,7 @@ def plot(y_true,y_pred,y_proba,plot_title):
 
     with open('../saved/history.pkl', 'rb') as f:
             history = pickle.load(f)
-            print(history.keys())
+            # print(history.keys())
             plot_metrics(history, location)
 
     with open(location + "scores.txt", 'w') as f:
@@ -275,9 +328,30 @@ if __name__ == '__main__':
     # read data
     df = pd.read_csv(args.csv)
 
+    def apt_sort(x):
+        # classes = ["APT 1", "APT 10", "APT 19", "APT 21", "APT 30", "Winnti", "APT 28", "APT 29", "Energetic Bear", "DarkHotel", "Equation Group", "Gorgon Group"]
+        index =     [      0,        1,        2,        3,        6,       11,        4,        5,                8,           7,                9,             10]
+        return index.index(x)
+    
+    # classes = ["APT 1", "APT 10", "APT 19", "APT 21", "APT 30", "Winnti", "APT 28", "APT 29", "Energetic Bear", "DarkHotel", "Equation Group", "Gorgon Group"]
+   
+    # print(df.columns.tolist())
+    # df['y_true']  = pd.Categorical(df['y_true'], index)
+    # df = df.sort_values('y_true')
+
+    # sorter =     [      0,        1,        2,        3,        6,       11,        4,        5,                8,           7,                9,             10]
+    # sorterIndex = dict(zip(sorter,range(len(sorter))))
+    # df['y_rank'] = df['y_true'].map(sorterIndex)
+    # print(df['y_rank'])
+    # df = df.sort_values('y_rank')
+
+    # df = df.argsort(apt_sort)
+   
     y_true = df['y_true'].values
     y_pred = df['y_pred'].values
-    y_proba = df.drop(['fn_list', 'y_true', 'y_pred'], axis=1).values
+    y_proba = df['y_pred'].values
+    # y_proba = df.drop(['fn_list', 'y_true', 'y_pred'], axis=1).values
 
+    init_seaborn()
     plot(y_true,y_pred,y_proba,args.plot_title)
 

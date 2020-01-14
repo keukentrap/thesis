@@ -55,7 +55,7 @@ parser.add_argument('csv', type=str)
 
 
 
-def train(model, max_len=200000, batch_size=64, verbose=True, epochs=100, save_path='../saved/', save_best=True):
+def train(model, data, label, max_len=200000, batch_size=64, verbose=True, epochs=100, save_path='../saved/', save_best=True):
     
     #Learning rate schedulers
     def step_decay(epoch):
@@ -67,7 +67,7 @@ def train(model, max_len=200000, batch_size=64, verbose=True, epochs=100, save_p
         return lrate
 
     # callbacks
-    ear = EarlyStopping(monitor='val_acc', patience=3)
+    ear = EarlyStopping(monitor='val_loss', patience=4)
     mcp = ModelCheckpoint(join(save_path, 'malconv.h5'), 
                           monitor="val_acc", 
                           save_best_only=save_best, 
@@ -76,8 +76,8 @@ def train(model, max_len=200000, batch_size=64, verbose=True, epochs=100, save_p
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.3,
                                  patience = 3, min_lr=0.00001)
 
-    y = to_categorical(label, num_classes=n_classes)
-    y_argmax = np.argmax(y,axis=1)
+    # y = to_categorical(label, num_classes=n_classes)
+    y_argmax = np.argmax(label,axis=1)
     class_weights = class_weight.compute_class_weight('balanced',
                                                       np.unique(y_argmax),
                                                       y_argmax)
@@ -88,7 +88,7 @@ def train(model, max_len=200000, batch_size=64, verbose=True, epochs=100, save_p
 
     history = model.fit(
         x=x_data,
-        y=y,
+        y=label,
         steps_per_epoch=len(x_data)//batch_size + 1,
         epochs=epochs, 
         verbose=verbose, 
@@ -168,8 +168,8 @@ if __name__ == '__main__':
 
     
     if args.kfold:
-        seed = 0
-        kfold = StratifiedKFold(n_splits=10, shuffle=True, random_state=seed)
+        seed = 1
+        kfold = StratifiedKFold(n_splits=args.kfold, shuffle=True, random_state=seed)
         cvscores = []
         for train_data, test in kfold.split(data, label):
             #x_train, x_test, y_train, y_test = data[train], data[test], label[train], label[test]
@@ -177,14 +177,19 @@ if __name__ == '__main__':
             #y_train = y_train.astype(float)
             print('Train on %d data, test on %d data' % (len(x_train), len(x_test)))
             model = generate_model(max_len, args.win_size, out_size=n_classes)
-            history = train(model, max_len, args.batch_size, args.verbose, args.epochs, args.save_path, args.save_best)
+            history = train(model, x_train, y_train, max_len, args.batch_size, args.verbose, args.epochs, args.save_path, args.save_best)
             
             # predict/evaluate
             pred, pred_proba = predict.predict(model,data[test],label[test])
+            # pred2, pred_proba2 = predict.predict(predict_data, predict_label)
 
+            # pred = np.concatenate(pred1,pred2)
+            # pred_proba = np.concatenate(pred1,pred2)
             filepath = "../saved/result{}.csv".format(len(cvscores))
             predict.write_to_csv(filepath,data[test],label[test],pred, pred_proba)
 
+            with open(join(args.save_path, 'history.pkl'), 'wb') as f:
+                pickle.dump(history.history, f)
 
             mcc = matthews_corrcoef(label[test],pred)
             print("%s: %.2f" % ("mcc", mcc))
@@ -198,7 +203,7 @@ if __name__ == '__main__':
         x_train, x_test, y_train, y_test = utils.train_test_split(data, label, args.val_size)
         #y_train = y_train.astype(float)
         print('Train on %d data, test on %d data' % (len(x_train), len(x_test)))
-        history = train(model, max_len, args.batch_size, args.verbose, args.epochs, args.save_path, args.save_best)
+        history = train(model, x_train, y_train, max_len, args.batch_size, args.verbose, args.epochs, args.save_path, args.save_best)
     
     if args.under_sample:
         pred, pred_proba = predict.predict(model, predict_data, predict_label, args.batch_size, args.verbose)
@@ -214,5 +219,5 @@ if __name__ == '__main__':
     plot_history(history)
 
     with open(join(args.save_path, 'history.pkl'), 'wb') as f:
-            pickle.dump(history.history, f)
+        pickle.dump(history.history, f)
 
