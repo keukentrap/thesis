@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/bin/python
 
 ##
 # Used to create the .csv file meant for training
@@ -48,19 +48,18 @@ with open('../dataset/APTMalware/overview.csv','r') as csvfile:
             #    print(fname)
 
             # Per country:
-            #c = label_by(row,'Country',labels)
+            c = label_by(row,'Country',labels)
 
             # China vs North-Korea
-            #if not c in [0,2]:
-            #    continue
-
-            #if c == 2:
-            #    c = 1
+            if not c in [0,2]:
+               continue
+            if c == 2:
+               c = 1
 
             # Merge China, North-Korea and Russia together into Asia.
-            c = merge_asia(row)
+            # c = merge_asia(row)
 
             # Per apt-group
-            #c = label_by(row,'APT-group',labels)
+            # c = label_by(row,'APT-group',labels)
 
             writer.writerow({'Sample': fname, "Label": c }) #'Country': row['Country'], 'APT-group': row['APT-group']})
