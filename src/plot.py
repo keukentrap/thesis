@@ -349,8 +349,8 @@ if __name__ == '__main__':
    
     y_true = df['y_true'].values
     y_pred = df['y_pred'].values
-    y_proba = df['y_pred'].values
-    # y_proba = df.drop(['fn_list', 'y_true', 'y_pred'], axis=1).values
+    # y_proba = df['y_pred'].values
+    y_proba = df.drop(['fn_list', 'y_true', 'y_pred'], axis=1).values
 
     init_seaborn()
     plot(y_true,y_pred,y_proba,args.plot_title)
